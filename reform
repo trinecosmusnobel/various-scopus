@@ -1,0 +1,82 @@
+new.abstract.scraper <- function(eid2) {
+  
+  content.api.url <- paste0("https://api.elsevier.com/content/abstract/eid/", 
+                            eid2, 
+                            "?apiKey=", api.key, "&insttoken=", inst.token)
+  
+  content         <- httr::content(GET(content.api.url))$`abstracts-retrieval-response`
+  
+  subj <- suppressWarnings(tryCatch(paste(content$`subject-areas` %>% bind_rows() %>% pull(`@code`), collapse = "; "),
+                                    error = function(e) {NA}
+  ))
+  
+  abstract <- tryCatch(content$item$bibrecord$head$abstracts,
+                       error = function(e) {NA}
+  )
+  
+  groups <- content$item$bibrecord$head$`author-group` 
+  
+  ######## PARSE DATA
+  multiple.afill <- is.null(groups$author) 
+  author.no <- length(groups$author) # if multiple authors, this is the number of authors
+  
+  # 1 author, 1 or more affil
+  if (author.no == 1) {
+   
+    
+    affil <- groups$affiliation
+    affil$organization <- paste(unlist(affil$organization), collapse = "; ")
+    affil.d <-  affil[!sapply(affil, is.list)] %>% bind_rows() %>% mutate(seq.affil = i)
+    author <- groups$author
+    author.d <- author %>% bind_rows() %>% distinct(`@auid`, .keep_all = TRUE)
+    
+    end <- bind_cols(author.d, affil.d)
+    
+  }
+  
+  if (author.no > 1) {
+    
+    if (multiple.afill == TRUE) {
+      
+      author.d <- list()
+      affil.d <- list()
+      
+      for (i in seq(groups)) {
+        
+        author.d[[i]] <- groups[[i]]$author %>% bind_rows() %>% distinct(`@auid`, .keep_all = TRUE) %>% mutate(seq.affil = i)
+        
+        affil <- groups[[i]]$affiliation
+        
+        affil$organization <- paste(unlist(affil$organization), collapse = "; ")
+        
+        affil.d[[i]] <- affil[!sapply(affil, is.list)] %>% bind_rows() %>% mutate(seq.affil = i)
+        
+      }
+      
+      affil.d <- affil.d %>% bind_rows()
+      author.d <- author.d %>% bind_rows()
+      
+      affil.d
+      author.d
+      
+      end <- left_join(author.d, affil.d)
+      
+    }
+    
+    if (multiple.afill == FALSE) {
+      
+      affil <- groups$affiliation
+      affil$organization <- paste(unlist(affil$organization), collapse = "; ")
+      affil.d <- affil %>% bind_rows()
+      
+      author.d <- groups$author %>% bind_rows() %>% distinct(`@auid`, .keep_all = TRUE)
+      
+      end <- bind_cols(author.d, affil.d) 
+      
+    }
+    
+  }
+  
+  end
+  
+}
