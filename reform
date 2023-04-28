@@ -80,3 +80,76 @@ new.abstract.scraper <- function(eid2) {
   end
   
 }
+
+
+
+check.limit <- function() {
+  
+  type <- readline("Which type do you want to see remaining calls for? (abstract/generic) ")
+  
+  if(!type %in% c("abstract", "generic")) stop('Exiting since you did not enter a correct value')
+  
+  if (type == "abstract") {
+    
+    c <- GET(paste0("https://api.elsevier.com/content/abstract/eid/2-s2.0-84903263494?apiKey=", 
+                    api.key, "&insttoken=", inst.token))
+    
+    writeLines(paste0("Abstract scraper status:\n",
+                      c$headers$`x-ratelimit-remaining`, " out of ",
+                      c$headers$`x-ratelimit-limit`, " calls reamining."))
+    
+  }
+  
+  if (type == "generic") {
+    
+    c <- GET(paste0("https://api.elsevier.com/content/search/scopus?cursor=*&count=200&query=AF-ID(", "60024521", ")++AND+PUBYEAR+%3E+", 1980, "+AND+PUBYEAR+%3C+", 1990, "&apiKey=", api.key, "&insttoken=", inst.token))
+    
+    writeLines(paste0("Abstract scraper status:\n",
+                      c$headers$`x-ratelimit-remaining`, " out of ",
+                      c$headers$`x-ratelimit-limit`, " calls reamining."))
+    
+    
+    
+  }
+  
+}
+
+
+
+clean.slade <- function(archive) {
+
+  user_input <- readline("Are you sure you want to run this? It will delete all data (YES/NO) ")
+  if(user_input != 'YES') stop('Exiting since you did not press YES')
+  
+  f <- list.files("Data/", include.dirs = F, full.names = T, recursive = T)
+  
+  if (setequal(f, character(0))) {
+    stop("There are no files to delete")
+  }
+  
+  archive.yes <- readline("Do you wish to make an archived version of the current files (YES/NO) ")
+  
+  if (archive.yes == "YES") {
+    # we make an archived version if that is the wish
+    file.archive <-paste0("Archived data/", gsub("[^0-9.-]", "_", Sys.time()))
+    dir.create(file.archive)
+    invisible(file.copy(from = f, to = gsub("Data/", file.archive, f)))
+  
+  }
+  
+  invisible(file.remove(f))
+  
+  if (archive.yes == "YES") {
+    writeLines("Files have been archived")  
+  }
+  
+  if (archive.yes == "NO") {
+    writeLines("Files have been deleted")  
+  }
+  
+  
+}
+
+
+
+
